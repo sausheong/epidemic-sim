@@ -8,18 +8,18 @@ import (
 // CELLSIZE is the radius of each cell
 var CELLSIZE = 10
 
-// MASKARRAY is an array of masks used to replace the traits
-var MASKARRAY []int = []int{0xFFFFF0, 0xFFFF0F, 0xFFF0FF, 0xFF0FFF, 0xF0FFFF, 0x0FFFFF}
-
 // Cell is a representation of a cell within the grid
 type Cell struct {
-	X        int
-	Y        int
-	R        int
-	Infected bool    // infected or not?
-	Duration int     // how long the infection lasts
-	Immunity float64 // immunity from getting it again
-	Color    color.Color
+	X           int
+	Y           int
+	R           int
+	Incubation  int     // incubation period
+	Infected    bool    // infected or not?
+	Duration    int     // how long the infection lasts
+	Immunity    float64 // immunity from getting it again
+	Medicated   bool    // taken medicine
+	Quarantined bool    // quarantined
+	Color       color.Color
 }
 
 // get the color integer back from the cell in the form 0x1A2B3C
@@ -35,8 +35,9 @@ func (c *Cell) setRGB(i int) {
 
 // cell becomes infected
 func (c *Cell) infected() {
-	c.setRGB(0xFF0000)
+	c.setRGB(0xFFCC99)
 	c.Infected = true
+	c.Incubation = *incubation
 	c.Duration = *duration
 	infected++
 }
@@ -45,6 +46,7 @@ func (c *Cell) infected() {
 func (c *Cell) recover() {
 	c.setRGB(0x00FF00)
 	c.Infected = false
+	c.Incubation = 0
 	c.Duration = 0
 	c.Immunity = *immunity
 	recovered++
@@ -58,16 +60,38 @@ func (c *Cell) die() {
 	dead++
 }
 
+// quarantine the cell
+func (c *Cell) quarantine() {
+	c.setRGB(0x99CCFF)
+	c.Quarantined = true
+}
+
+// medicate the cell
+func (c *Cell) medicate() {
+	if rand.Float64() < *medEffectiveness {
+		c.recover()
+	} else {
+		// the cell has been medicated but it didn't work
+		c.Medicated = true
+	}
+}
+
 // process the infected cell
 func (c *Cell) process() {
 	if c.Infected {
-		if c.Duration > 0 {
-			c.Duration = c.Duration - 1
+		// if still in in incubation stage
+		if c.Incubation > 0 {
+			c.Incubation = c.Incubation - 1
 		} else {
-			if rand.Float64() > *fatality {
-				c.recover()
+			c.setRGB(0xFF0000)
+			if c.Duration > 0 {
+				c.Duration = c.Duration - 1
 			} else {
-				c.die()
+				if rand.Float64() > *fatality {
+					c.recover()
+				} else {
+					c.die()
+				}
 			}
 		}
 	}
@@ -76,13 +100,15 @@ func (c *Cell) process() {
 // create a cell
 func createCell(x, y, clr int) (c Cell) {
 	c = Cell{
-		X:        x,
-		Y:        y,
-		R:        CELLSIZE, // radius of cell
-		Color:    color.RGBA{getR(clr), getG(clr), getB(clr), uint8(255)},
-		Infected: false,
-		Duration: 0,
-		Immunity: 0.0,
+		X:           x,
+		Y:           y,
+		R:           CELLSIZE, // radius of cell
+		Color:       color.RGBA{getR(clr), getG(clr), getB(clr), uint8(255)},
+		Incubation:  0,
+		Infected:    false,
+		Duration:    0,
+		Immunity:    0.0,
+		Quarantined: false,
 	}
 	return
 }
@@ -94,7 +120,7 @@ func createPopulation() {
 	for i := 1; i <= *width; i++ {
 		for j := 1; j <= *width; j++ {
 			p := rand.Float64()
-			if p < *coverage {
+			if p < *density {
 				cells[n] = createCell(i*CELLSIZE, j*CELLSIZE, 0x00FF00)
 				living++
 			} else {
@@ -105,14 +131,15 @@ func createPopulation() {
 	}
 }
 
-// choose 1 cell to be patient zero
+// choose 1 cell to be patient zero in the middle of the simulation
 func infectOneCell() {
-	i := rand.Intn(*width * (*width))
+	i := (*width * (*width) / 2) + (*width / 2)
 	cells[i].setRGB(0xFF0000)
 	cells[i].Infected = true
 	cells[i].Duration = *duration
 }
 
+// count how many are never infected
 func countNeverInfected() int {
 	count := 0
 	for _, cell := range cells {
