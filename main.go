@@ -47,7 +47,7 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	// capturing user input
-	numDays = flag.Int("t", 200, "number of simulation days")
+	numDays = flag.Int("t", 300, "number of simulation days")
 	width = flag.Int("w", 60, "the number of cells on one side of the image")
 	rate = flag.Float64("r", 0.15, "how likely infection happens")
 	incubation = flag.Int("n", 3, "how long before the cell becomes infectious")
@@ -186,12 +186,12 @@ func output(t int) {
 	if *qIntroduced < *numDays {
 		fmt.Println("\n\nQUARANTINE")
 		fmt.Printf("Quarantine introduced    : %dth day", *qIntroduced)
-		fmt.Printf("\nQuarantine effectiveness : %2.1f%% found and quarantined\n", *qEffectiveness*100)
+		fmt.Printf("\nQuarantine effectiveness : %2.1f%% found and quarantined", *qEffectiveness*100)
 	}
-	if *medEffectiveness > 0.0 {
+	if *medIntroduced < *numDays {
 		fmt.Println("\n\nMEDICINE")
 		fmt.Printf("Med introduced    : %dth day", *medIntroduced)
-		fmt.Printf("\nMed effectiveness : %2.1f%% recovery", *medEffectiveness*100)
+		fmt.Printf("\nMed effectiveness : %2.1f%% recovery\n", *medEffectiveness*100)
 	}
 }
 
